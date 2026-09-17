@@ -159,6 +159,9 @@ tr:hover{background:#f8fafc}
 .room-pill:hover{background:#fde68a}
 .room-pill.selected{background:#b45309;color:#fff;border-color:#b45309}
 .room-pill .ord{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;border-radius:50%;background:rgba(0,0,0,.18);font-size:9px;font-weight:700}
+.room-tag-dd summary{list-style:none}
+.room-tag-dd summary::-webkit-details-marker{display:none}
+.room-tag-dd[open] summary{background:#fde68a!important}
 .room-cap-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
 .room-cap-badge.warn{background:#fef3c7;color:#92400e;border-color:#fde68a}
 .room-cap-badge.over{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
@@ -238,7 +241,7 @@ tr:hover{background:#f8fafc}
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Code</th><th>Title</th><th>Program</th><th>Section</th><th>Faculty</th><th>Students</th><th>Lab</th><th>Excl.</th><th></th></tr></thead>
+        <thead><tr><th>Code</th><th>Title</th><th>Program</th><th>Section</th><th>Faculty</th><th>Students</th><th>Lab</th><th>Excl.</th><th>Rooms</th><th></th></tr></thead>
         <tbody id="coursesBody"></tbody>
       </table>
     </div>
@@ -355,7 +358,7 @@ tr:hover{background:#f8fafc}
     <div class="row" style="flex-direction:column;align-items:flex-start;gap:6px">
       <label style="display:flex;gap:6px;align-items:center;font-weight:normal">
         <input type="checkbox" id="chkMergeSections" onchange="state.mergeSectionsByCode=this.checked;save()">
-        <b>Section grouping</b> — auto-merge a course offered in two+ sections (same course code) into one session, so all sections sit the exam together
+        <b>Section grouping</b> — auto-merge a course offered in two+ sections (same course code <b>or</b> the same course name) into one session, so all sections sit the exam together
       </label>
       <label style="display:flex;gap:6px;align-items:center;font-weight:normal">
         <input type="checkbox" id="chkTeacherDays" onchange="state.groupTeacherDays=this.checked;save()">
@@ -654,7 +657,7 @@ tr:hover{background:#f8fafc}
 </div>
 <div class="row" style="margin-top:10px"><button class="btn" onclick="xlsxTimetableProgram()">⬇ Generate Excel Date Sheet</button><button class="btn ghost" onclick="pdfTimetableProgram()">⬇ Generate PDF Date Sheet</button></div></div>
     <div class="card"><h3>Timetable — Day-wise</h3><div class="desc">All exams per day with course, faculty, time.</div><div class="row"><button class="btn" onclick="xlsxTimetableDay()">⬇ Excel</button><button class="btn ghost" onclick="pdfTimetableDay()">⬇ PDF</button></div></div>
-    <div class="card"><h3>Student Individual Timetables</h3><div class="desc">One row/page per student showing their name, roll no, all scheduled exams with date, time, room and seat number.</div><div class="row"><button class="btn" onclick="xlsxStudentPapers()">⬇ Excel</button><button class="btn ghost" onclick="pdfStudentPapers()">⬇ PDF</button></div></div>
+    <div class="card"><h3>Student Individual Timetables</h3><div class="desc">One row/page per student showing their name, roll no, all scheduled exams with date, time, room and seat number.</div><div class="row"><button class="btn" onclick="xlsxStudentPapers()">⬇ Excel</button><button class="btn ghost" onclick="pdfStudentPapers()">⬇ PDF (table)</button><button class="btn ghost" onclick="pdfStudentAdmitCards()">⬇ PDF (Admit Card — 1 page/student)</button></div></div>
     <div class="card"><h3>Daily Class Schedule</h3><div class="desc">Per-day exam schedule with assigned rooms.</div><div class="row"><button class="btn" onclick="xlsxDaily()">⬇ Excel</button><button class="btn ghost" onclick="pdfDaily()">⬇ PDF</button></div></div>
     <div class="card"><h3>Seating Plan (room grid)</h3><div class="desc">Room-by-room seat layout for each session, laid out as a row/column grid.</div><div class="row"><button class="btn" onclick="xlsxSeatingGrid()">⬇ Excel</button><button class="btn ghost" onclick="pdfSeating()">⬇ PDF</button></div></div>
     <div class="card"><h3>Faculty Duty Sheet</h3><div class="desc">Faculty list per session with their courses.</div><div class="row"><button class="btn" onclick="xlsxFaculty()">⬇ Excel</button><button class="btn ghost" onclick="pdfFaculty()">⬇ PDF</button></div></div>
@@ -765,7 +768,7 @@ let state = {
   timetableTaggedPrograms: null, // programs selected for merged/custom timetable reports
   timetableProgramGroups: [], // [{id,name,department,programs:[]}] custom report groups
   schedulingGroups: [], // manual course groups: {id, name, courseIds:[]} -- forced into the same session
-  mergeSectionsByCode: true,   // auto: courses sharing the same course code (different sections) always land in the same session
+  mergeSectionsByCode: true,   // auto: courses sharing the same course code, or the same course name (different sections), always land in the same session
   groupTeacherDays: true,      // soft: prefer putting all of one teacher's exams on the same day (different sessions ok)
   sessionMode: 3,
   maxExamsPerDay: 2,
@@ -1104,10 +1107,40 @@ function renderCourses(){
       <td><input type="number" value="${c.studentCount}" onchange="updCourse('${c.id}','studentCount',this.value)" style="width:70px"></td>
       <td><input type="checkbox" ${c.isLab?'checked':''} onchange="updCourse('${c.id}','isLab',this.checked);renderCourses();updateExclusions()"></td>
       <td><input type="checkbox" ${c.excluded?'checked':''} onchange="updCourse('${c.id}','excluded',this.checked);updateExclusions()"></td>
+      <td style="min-width:130px">
+        <details data-course="${c.id}" class="room-tag-dd">
+          <summary style="cursor:pointer;font-size:11px;padding:3px 8px;border:1px solid var(--brd);border-radius:12px;display:inline-block;background:${(c.allowedRoomIds&&c.allowedRoomIds.length)?'#fef3c7':'#f8fafc'}" title="Restrict this course's seating to specific room(s). Leave as 'Any room' to let Auto Seating pick freely.">🏛 ${(c.allowedRoomIds&&c.allowedRoomIds.length)?c.allowedRoomIds.length+' room'+(c.allowedRoomIds.length>1?'s':''):'Any room'}</summary>
+          <div style="margin-top:4px;max-width:220px">
+            ${state.rooms.filter(r=>r.active!==false).map(r=>{
+              const sel = (c.allowedRoomIds||[]).includes(r.id);
+              return `<span class="room-pill${sel?' selected':''}" data-room="${r.id}" onclick="toggleCourseRoom('${c.id}','${r.id}')">${esc(r.name)}</span>`;
+            }).join('') || '<span class="desc">No active rooms yet -- add one in the Rooms tab.</span>'}
+          </div>
+        </details>
+      </td>
       <td><button class="btn sm danger" onclick="delCourse('${c.id}')">×</button></td>
-    </tr>`).join('') || `<tr><td colspan="9" class="empty-state">No courses -- upload Excel or click Add.</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="10" class="empty-state">No courses -- upload Excel or click Add.</td></tr>`;
 }
 function esc(s){ return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function toggleCourseRoom(courseId, roomId){
+  const c = state.courses.find(x=>x.id===courseId); if(!c) return;
+  c.allowedRoomIds = c.allowedRoomIds || [];
+  if(c.allowedRoomIds.includes(roomId)) c.allowedRoomIds = c.allowedRoomIds.filter(id=>id!==roomId);
+  else c.allowedRoomIds.push(roomId);
+  save();
+  // Update just this row's dropdown in place (instead of a full renderCourses)
+  // so the <details> panel stays open while the admin ticks several rooms.
+  const det = document.querySelector(`details[data-course="${courseId}"]`);
+  if(det){
+    const pill = det.querySelector(`.room-pill[data-room="${roomId}"]`);
+    if(pill) pill.classList.toggle('selected', c.allowedRoomIds.includes(roomId));
+    const sum = det.querySelector('summary');
+    if(sum) sum.textContent = c.allowedRoomIds.length ? `🏛 ${c.allowedRoomIds.length} room${c.allowedRoomIds.length>1?'s':''}` : '🏛 Any room';
+    sum && (sum.style.background = c.allowedRoomIds.length ? '#fef3c7' : '#f8fafc');
+  } else {
+    renderCourses();
+  }
+}
 
 /* ================= ROOMS ================= */
 function addRoom(){ state.rooms.push({id:uid(),name:'New Room',cols:6,rows:8,capacity:48,active:true,isLab:false}); save(); renderRooms(); updateStats(); }
@@ -1277,9 +1310,11 @@ function roomCapacity(room){ return Math.max(0, +(room?.capacity || room?.cols *
 // indivisible block -- every course inside a unit ALWAYS lands in the same
 // session, together:
 //   • Section grouping  (state.mergeSectionsByCode): any courses sharing the
-//     same course code -- i.e. the same course offered as separate sections --
-//     are merged automatically. This is what makes "Course X, Section A" and
-//     "Course X, Section B" sit their exam on the same day/session.
+//     same course code, OR the same course name/title -- i.e. the same paper
+//     offered as separate sections, sometimes entered under slightly
+//     different codes -- are merged automatically. This is what makes
+//     "Course X, Section A" and "Course X, Section B" sit their exam on the
+//     same day/session even if one section's code was typed differently.
 //   • Course grouping   (state.schedulingGroups): admin-defined groups of any
 //     courses (different codes, different programs -- e.g. electives that must
 //     run at the same time) are merged the same way.
@@ -1296,11 +1331,20 @@ function buildSchedulingUnits(courseList, enrollMap){
 
   if(state.mergeSectionsByCode){
     const byCode = new Map();
+    const byTitle = new Map();
     courseList.forEach(c => {
-      const key = String(c.code || '').trim().toUpperCase();
-      if(!key) return;
-      if(byCode.has(key)) union(c.id, byCode.get(key));
-      else byCode.set(key, c.id);
+      const codeKey = String(c.code || '').trim().toUpperCase();
+      if(codeKey){
+        if(byCode.has(codeKey)) union(c.id, byCode.get(codeKey));
+        else byCode.set(codeKey, c.id);
+      }
+      // Same course name/title also counts as the same paper, even when the
+      // code differs between sections (e.g. a typo or a section-specific code).
+      const titleKey = String(c.title || '').trim().toUpperCase();
+      if(titleKey){
+        if(byTitle.has(titleKey)) union(c.id, byTitle.get(titleKey));
+        else byTitle.set(titleKey, c.id);
+      }
     });
   }
   (state.schedulingGroups || []).forEach(g => {
@@ -1651,6 +1695,7 @@ function runSeating(onlyGrouped){
   const manualGroups = (state.manualProgramGroups||[]).filter(g=>g.programs&&g.programs.length>=1);
   const seatsPerCol = state.seatsPerColumn || 8;
   let pinnedOverflowCount = 0;
+  let roomTagOverflowCount = 0;
   let noLabRoomCount = 0;
   const allGroupedCourseIds = new Set(); // accumulated across sessions, used for onlyGrouped totals
 
@@ -1768,12 +1813,48 @@ function runSeating(onlyGrouped){
     if(!onlyGrouped){
       const ungroupedCourseIds = sessExams.map(ex=>ex.courseId).filter(cid=>!groupedCourseIds.has(cid));
       if(ungroupedCourseIds.length){
+        // Courses individually tagged (in the Data tab) to specific rooms are
+        // pinned there first -- independent of manual groups and Lab routing.
+        // Courses that share the exact same room selection are seated
+        // together, filling their tagged room(s) largest-first, same as a
+        // manual group's pinned rooms; any overflow spills into the shared pool.
+        const roomTaggedIds = ungroupedCourseIds.filter(cid=>{ const c=courseById.get(cid); return c && c.allowedRoomIds && c.allowedRoomIds.length; });
+        const untaggedIds = ungroupedCourseIds.filter(cid=>!roomTaggedIds.includes(cid));
+
+        if(roomTaggedIds.length){
+          const byRoomSet = new Map();
+          roomTaggedIds.forEach(cid=>{
+            const c = courseById.get(cid);
+            const key = [...c.allowedRoomIds].sort().join(',');
+            if(!byRoomSet.has(key)) byRoomSet.set(key, []);
+            byRoomSet.get(key).push(cid);
+          });
+          byRoomSet.forEach((cids, key)=>{
+            const tagStrips = buildStrips(cids);
+            if(!tagStrips.length) return;
+            const tagRooms = key.split(',').map(id=>activeRooms.find(r=>r.id===id)).filter(Boolean)
+              .sort((a,b)=>roomCapacity(b)-roomCapacity(a));
+            if(!tagRooms.length){
+              // Tagged room(s) no longer exist or are inactive -- fall back to the shared pool.
+              const result = placeStrips(tagStrips, roomIdx, colCursor);
+              roomIdx = result.roomIdx; colCursor = result.colCursor;
+              return;
+            }
+            const res = placeStripsInto(tagStrips, tagRooms, 0, 1, seatsPerCol);
+            if(res.leftover > 0){
+              const result = placeStrips(tagStrips, roomIdx, colCursor);
+              roomIdx = result.roomIdx; colCursor = result.colCursor;
+              roomTagOverflowCount++;
+            }
+          });
+        }
+
         // Lab-marked papers go into Lab-marked rooms only, kept separate
         // from the ordinary room pool. If no Lab room is configured yet,
         // fall back to the shared pool so the paper still gets seated
         // somewhere, and flag it in the completion toast.
-        const labIds = ungroupedCourseIds.filter(cid=>{ const c=courseById.get(cid); return c&&c.isLab; });
-        const nonLabIds = ungroupedCourseIds.filter(cid=>!labIds.includes(cid));
+        const labIds = untaggedIds.filter(cid=>{ const c=courseById.get(cid); return c&&c.isLab; });
+        const nonLabIds = untaggedIds.filter(cid=>!labIds.includes(cid));
         if(labIds.length){
           const labStrips = buildStrips(labIds);
           if(labStrips.length){
@@ -1856,6 +1937,7 @@ function runSeating(onlyGrouped){
     (groupCount ? ` (${groupCount} group${groupCount>1?'s':''} seated together)` : '') +
     (onlyGrouped ? ` — ungrouped students left unseated` : '') +
     (pinnedOverflowCount ? ` ⚠ ${pinnedOverflowCount} pinned-room group${pinnedOverflowCount>1?'s':''} overflowed into other rooms` : '') +
+    (roomTagOverflowCount ? ` ⚠ ${roomTagOverflowCount} room-tagged course${roomTagOverflowCount>1?'s':''} overflowed into other rooms` : '') +
     (noLabRoomCount ? ` ⚠ ${noLabRoomCount} Lab course(s) seated in regular rooms -- no Lab room is configured (check the Lab box in Rooms)` : '') +
     (parkedCount ? ` · ${parkedCount} parked for manual placement` : '') +
     (unplaced>0 ? ` ⚠ ${unplaced} could not fit — add more rooms` : ' ✓'),
@@ -2536,7 +2618,7 @@ function renderSeating(){
         return `<div class="section-room">
           <h4>${esc(room.name)} -- ${room.cols} cols × ${room.rows} rows</h4>
           <div class="legend" style="margin-bottom:10px">
-            ${cIds.map(cid => { const c = state.courses.find(x=>x.id===cid); return c?`<span class="lg ${courseColor.get(cid)}">${esc(c.code)} ${esc(c.section)}</span>`:'';}).join('')}
+            ${cIds.map(cid => { const c = state.courses.find(x=>x.id===cid); return c?`<span class="lg ${courseColor.get(cid)}" title="${esc(c.title||'')}">${esc(c.title?c.title+' -- ':'')}${esc(c.code)} ${esc(c.section)}</span>`:'';}).join('')}
             <span class="lg" style="background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1">-- gap col</span>
           </div>
           <div style="overflow-x:auto">
@@ -2551,7 +2633,7 @@ function renderSeating(){
                    ondragstart='startColumnDrag(event,${JSON.stringify({sessionId:sess.id,roomId:rid,col:ci})})'
                    ${colDropAttrs}
                    title="Drag to move or swap this whole column (${colSeats.length} student${colSeats.length===1?'':'s'}) with any other column, in this room or another room">
-                   ${isGap ? '· gap ·' : `⠿ ${esc(colCourse?colCourse.code:('Col '+ci))} (${colSeats.length})`}
+                   ${isGap ? '· gap ·' : `<span style="display:block;font-size:8px;font-weight:700;line-height:1.2">${esc(colCourse?colCourse.title:'')}</span>⠿ ${esc(colCourse?colCourse.code:('Col '+ci))} (${colSeats.length})`}
                  </div>`;
               }).join('')}
               ${Array.from({length:displayRows}).flatMap((_,ri) =>
@@ -2573,9 +2655,10 @@ function renderSeating(){
                      ondragstart='startSeatedStudentDrag(event,${JSON.stringify({sessionId:seat.sessionId,roomId:seat.roomId,row:seat.row,col:seat.col,studentId:seat.studentId,courseId:seat.courseId})})'
                      style="min-height:42px" title="${esc(stu?stu.name+' · ID: '+stu.rollNo:seat.studentId)} -- ${esc(c?c.code:'')}${seat.manual?' -- MANUAL':''}">
                      <input type="checkbox" class="seat-select" onclick="toggleDragSelection(event,'seat','${seatKey}',this.checked)" aria-label="Select ${esc(stu?.name||seat.studentId)}">
+                     <span style="font-size:6px;font-weight:700;color:inherit;opacity:.9;line-height:1.1;display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(c?c.title:'')}">${esc(c?c.title:'')}</span>
+                     <span style="font-size:6px;color:inherit;opacity:.75">${esc(c?c.code:'')}</span>
                      <span class="seat-student-name">${esc(stu?stu.name:seat.studentId.slice(-8))}</span>
                      <span style="font-family:monospace;font-size:6px">ID: ${esc(stu?stu.rollNo:seat.studentId)}</span>
-                    <span style="font-size:6px;color:inherit;opacity:.75">${esc(c?c.code:'')}</span>
                   </div>`;
                 })
               ).join('')}
@@ -2818,6 +2901,7 @@ function assignManualClashSeat(studentId, sessionId, roomId, row, col, preferred
   state.manualSeatOverrides=state.manualSeatOverrides.filter(x=>!(x.studentId===studentId&&x.sessionId===sessionId));
   state.manualSeatOverrides.push(ov);
   state.seating.push({...ov,manual:true});
+  ensureScheduled(sessionId, chosen.id);
   markJustPlaced(sessionId, roomId, row, col);
   save(); renderSeating();
   toast(`✓ ${st.name} assigned to ${chosen.code} at ${room.name}, Row ${row}, Column ${col}`,'ok');
@@ -2885,6 +2969,19 @@ function dropToStudentPark(ev, sessionId){
   }
   clearDragState();
 }
+// Ensure a (session, course) pairing exists in state.scheduled. Manual seating
+// paths (e.g. dragging a parked/unscheduled paper straight onto a seat) create
+// real seats without ever going through Auto Schedule, so every report that
+// lists a session's exams via state.scheduled would otherwise never see them.
+// Called wherever a seat is manually created for a course; a no-op if the
+// course was already scheduled (the normal Auto Schedule path).
+function ensureScheduled(sessionId, courseId){
+  if(!state.scheduled.some(sc=>sc.sessionId===sessionId && sc.courseId===courseId)){
+    state.scheduled.push({id:uid(), sessionId, courseId});
+    return true;
+  }
+  return false;
+}
 function assignParkedStudents(entries, sessionId, roomId, row, col){
   const candidates=(entries||[]).filter(entry=>entry.sessionId===sessionId &&
     (state.parkedStudents||[]).some(p=>p.sessionId===entry.sessionId&&p.studentId===entry.studentId&&p.courseId===entry.courseId));
@@ -2911,6 +3008,7 @@ function assignParkedStudents(entries, sessionId, roomId, row, col){
       .filter(x=>!(x.sessionId===sessionId&&x.studentId===entry.studentId&&x.courseId===entry.courseId));
     state.manualSeatOverrides.push(ov);
     state.seating.push({...ov,manual:true});
+    ensureScheduled(sessionId, entry.courseId);
     occupied.add(`${slot.roomId}|${slot.row}|${slot.col}`);
     markJustPlaced(sessionId, slot.roomId, slot.row, slot.col);
     // Confirm exactly which course landed where, not just a headcount --
@@ -2941,6 +3039,7 @@ function moveSeatedStudentSeat(source, sessionId, roomId, row, col){
     .filter(x=>!(x.sessionId===sessionId&&x.studentId===source.studentId&&x.courseId===source.courseId));
   state.manualSeatOverrides.push(ov);
   state.seating.push({...ov,manual:true});
+  ensureScheduled(sessionId, source.courseId);
   markJustPlaced(sessionId, roomId, row, col);
   save(); renderSeating();
   const st=state.students.find(x=>x.id===source.studentId);
@@ -4840,8 +4939,10 @@ function renderCourseClashes(){
 function isCourseGrouped(course){
   if(!course) return false;
   if(state.mergeSectionsByCode){
-    const key = String(course.code||'').trim().toUpperCase();
-    if(key && state.courses.filter(c=>String(c.code||'').trim().toUpperCase()===key).length > 1) return true;
+    const codeKey = String(course.code||'').trim().toUpperCase();
+    if(codeKey && state.courses.filter(c=>String(c.code||'').trim().toUpperCase()===codeKey).length > 1) return true;
+    const titleKey = String(course.title||'').trim().toUpperCase();
+    if(titleKey && state.courses.filter(c=>String(c.title||'').trim().toUpperCase()===titleKey).length > 1) return true;
   }
   return (state.schedulingGroups||[]).some(g => (g.courseIds||[]).includes(course.id) && (g.courseIds||[]).length>1);
 }
@@ -4850,7 +4951,7 @@ function renderCourseGroupsCard(){
   if(!el) return;
   const groups = state.schedulingGroups || [];
   if(!groups.length){
-    el.innerHTML = '<div class="empty-state" style="padding:10px 0">No manual course groups yet. Section grouping (same course code) is handled automatically above.</div>';
+    el.innerHTML = '<div class="empty-state" style="padding:10px 0">No manual course groups yet. Section grouping (same course code or same course name) is handled automatically above.</div>';
     return;
   }
   el.innerHTML = groups.map(g => {
@@ -6327,10 +6428,15 @@ function xlsxTimetableDay(){
   xlsxDownload(sheets, 'timetable-day-wise.xlsx');
 }
 function xlsxStudentPapers(){
+  const selectedPrograms = new Set(selectedTimetablePrograms());
   const rows = [...state.students].filter(st=>st.courseIds && st.courseIds.length)
     .sort((a,b)=>a.rollNo.localeCompare(b.rollNo)).flatMap(st=>{
       return st.courseIds.map(cid=>{
         const c = state.courses.find(x=>x.id===cid); if(!c) return null;
+        // Only include papers belonging to a program currently ticked in
+        // Timetable -- Program-wise (DSU Final Date Sheet); keeps this report
+        // scoped to the same department/program selection as that report.
+        if(selectedPrograms.size && !selectedPrograms.has(c.program)) return null;
         const sc = state.scheduled.find(x=>x.courseId===cid);
         const sess = sc ? state.sessions.find(x=>x.id===sc.sessionId) : null;
         const seat = state.seating.find(x=>x.studentId===st.id && x.courseId===cid);
@@ -6339,13 +6445,14 @@ function xlsxStudentPapers(){
         const sortKey = sess ? `${sess.date||''}|${sess.startTime||''}` : '9999-99-99|99:99';
         return { sortKey, row: {
           'Roll No':st.rollNo, 'Name':st.name, 'Program':st.program||'', 'Section':st.section||'',
-          'Course':c.code, 'Title':c.title, 'Date':sess?sess.date:'', 'Time':sess?`${sess.startTime}-${sess.endTime}`:'',
-          'Room':room?room.name:'', 'Seat':seat?`COL-${seat.col} / ROW-${seat.row}`:''
+          'Course':c.code, 'Subject Name':c.title, 'Date':sess?sess.date:'', 'Time':sess?`${sess.startTime}-${sess.endTime}`:'',
+          'Room':room?room.name:'', 'Row':seat?seat.row:'', 'Column':seat?seat.col:''
         }};
       }).filter(Boolean)
       .sort((a,b)=>a.sortKey.localeCompare(b.sortKey))
       .map(x=>x.row);
     });
+  if(!rows.length){ toast(selectedPrograms.size ? 'No students match the selected department/program(s) in Timetable -- Program-wise' : 'No student paper data yet','warn'); return; }
   xlsxDownload({'Student Timetables':rows}, 'student-individual-timetables.xlsx');
 }
 function xlsxDaily(){
@@ -6449,10 +6556,15 @@ function pdfTimetableDay(){
   toast(`Downloaded Day-wise Timetable PDF -- ${dates.length} day(s)`,'ok');
 }
 function pdfStudentPapers(){
+  const selectedPrograms = new Set(selectedTimetablePrograms());
   const rows = [...state.students].filter(st=>st.courseIds && st.courseIds.length)
     .sort((a,b)=>a.rollNo.localeCompare(b.rollNo)).flatMap(st=>{
       return st.courseIds.map(cid=>{
         const c = state.courses.find(x=>x.id===cid); if(!c) return null;
+        // Only include this student's papers that belong to a program currently
+        // selected/ticked in Timetable -- Program-wise (DSU Final Date Sheet).
+        // Selecting fewer departments there narrows this report the same way.
+        if(selectedPrograms.size && !selectedPrograms.has(c.program)) return null;
         const sc = state.scheduled.find(x=>x.courseId===cid);
         const sess = sc ? state.sessions.find(x=>x.id===sc.sessionId) : null;
         const seat = state.seating.find(x=>x.studentId===st.id && x.courseId===cid);
@@ -6461,15 +6573,15 @@ function pdfStudentPapers(){
         return { sortKey, row: [
           st.rollNo, st.name, st.program||'', st.section||'',
           c.code||'', c.title||'', sess?formatDateSheetDate(sess.date):'', sess?`${sess.startTime}-${sess.endTime}`:'',
-          room?room.name:'', seat?`COL-${seat.col} / ROW-${seat.row}`:''
+          room?room.name:'', seat?`Row ${seat.row}`:'', seat?`Col ${seat.col}`:''
         ]};
       }).filter(Boolean).sort((a,b)=>a.sortKey.localeCompare(b.sortKey)).map(x=>x.row);
     });
-  if(!rows.length){ toast('No student paper data yet -- run Auto Schedule and Generate Seating first','warn'); return; }
+  if(!rows.length){ toast(selectedPrograms.size ? 'No students match the selected department/program(s) in Timetable -- Program-wise' : 'No student paper data yet -- run Auto Schedule and Generate Seating first','warn'); return; }
   const doc = new jsPDF({unit:'pt',format:'a4',orientation:'landscape'});
-  const y = pdfReportHeader(doc, 'STUDENT INDIVIDUAL TIMETABLES');
+  const y = pdfReportHeader(doc, 'STUDENT INDIVIDUAL TIMETABLES', excelDepartmentHeaderLabel());
   doc.autoTable({
-    head:[['Roll No','Name','Program','Section','Course','Title','Date','Time','Room','Seat']],
+    head:[['Roll No','Name','Program','Section','Course','Subject Name','Date','Time','Room','Row','Column']],
     body:rows, startY:y,
     styles:{font:'helvetica',fontSize:7.5,cellPadding:3,textColor:[0,0,0],lineColor:[0,0,0],lineWidth:.35,overflow:'linebreak'},
     headStyles:{fillColor:[30,64,175],textColor:255,fontStyle:'bold'},
@@ -6478,6 +6590,88 @@ function pdfStudentPapers(){
   });
   doc.save('student-individual-timetables.pdf');
   toast(`Downloaded Student Individual Timetables PDF -- ${rows.length} paper row(s)`,'ok');
+}
+// Admit-card style export: one full page per student (portrait A4) with a
+// bordered student-info box up top (roll no / name / program / section),
+// then a table of that student's own exams (date, time, room, seat), then
+// a 2-way signature line (Student / Controller of Examination) at the foot
+// of the page. Mirrors pdfStudentPapers' filtering (program tag selection)
+// but renders per-student pages instead of one shared table.
+function pdfStudentAdmitCards(){
+  const selectedPrograms = new Set(selectedTimetablePrograms());
+  const students = [...state.students].filter(st=>st.courseIds && st.courseIds.length)
+    .sort((a,b)=>a.rollNo.localeCompare(b.rollNo));
+  const doc = new jsPDF({unit:'pt',format:'a4',orientation:'portrait'});
+  let page = 0;
+  students.forEach(st=>{
+    const papers = st.courseIds.map(cid=>{
+      const c = state.courses.find(x=>x.id===cid); if(!c) return null;
+      if(selectedPrograms.size && !selectedPrograms.has(c.program)) return null;
+      const sc = state.scheduled.find(x=>x.courseId===cid);
+      const sess = sc ? state.sessions.find(x=>x.id===sc.sessionId) : null;
+      const seat = state.seating.find(x=>x.studentId===st.id && x.courseId===cid);
+      const room = seat ? state.rooms.find(r=>r.id===seat.roomId) : null;
+      const sortKey = sess ? `${sess.date||''}|${sess.startTime||''}` : '9999-99-99|99:99';
+      return { sortKey, row:[
+        c.code||'', c.title||'',
+        sess?`${dayName(sess.date)}, ${formatDateSheetDate(sess.date)}`:'--',
+        sess?`${sess.startTime||''}-${sess.endTime||''}`:'--',
+        room?room.name:'--', seat?`Row ${seat.row}, Col ${seat.col}`:'--'
+      ]};
+    }).filter(Boolean).sort((a,b)=>a.sortKey.localeCompare(b.sortKey)).map(x=>x.row);
+    if(!papers.length) return;
+    if(page++) doc.addPage();
+    const pw = doc.internal.pageSize.getWidth();
+    const y0 = pdfReportHeader(doc, 'EXAMINATION ADMIT CARD', st.program || '');
+
+    // Bordered student-info box
+    const boxX=40, boxY=y0+6, boxW=pw-80, boxH=72;
+    doc.setDrawColor(30,64,175).setLineWidth(1);
+    doc.rect(boxX, boxY, boxW, boxH);
+    doc.setDrawColor(226,232,240).setLineWidth(0.5);
+    doc.line(boxX, boxY+boxH/2, boxX+boxW, boxY+boxH/2);
+    doc.line(boxX+boxW/2, boxY, boxX+boxW/2, boxY+boxH);
+    doc.setTextColor(0,0,0);
+    const col1X=boxX+14, col2X=boxX+boxW/2+14, r1Y=boxY+boxH/4+3, r2Y=boxY+boxH*3/4+3;
+    const field=(x,y,label,val)=>{
+      doc.setFont('helvetica','bold').setFontSize(9);
+      doc.text(label, x, y);
+      doc.setFont('helvetica','normal').setFontSize(10);
+      doc.text(String(val||'--'), x, y+13);
+    };
+    field(col1X, r1Y-6, 'ROLL NO', st.rollNo);
+    field(col2X, r1Y-6, 'PROGRAM', st.program);
+    field(col1X, r2Y-6, 'NAME', st.name);
+    field(col2X, r2Y-6, 'SECTION', st.section);
+
+    doc.autoTable({
+      head:[['Course','Subject Name','Date','Time','Room','Seat']],
+      body: papers, startY: boxY+boxH+18,
+      styles:{font:'helvetica',fontSize:9,cellPadding:5.5,textColor:[0,0,0],lineColor:[0,0,0],lineWidth:.4,overflow:'linebreak'},
+      headStyles:{fillColor:[30,64,175],textColor:255,fontStyle:'bold'},
+      margin:{left:40,right:40}
+    });
+
+    const noteY = doc.lastAutoTable.finalY + 22;
+    doc.setFont('helvetica','italic').setFontSize(8.5).setTextColor(90,90,90);
+    doc.text('This admit card must be presented, along with a valid university ID card, at every examination listed above.', 40, noteY, {maxWidth: pw-80});
+    doc.setTextColor(0,0,0);
+
+    // 2-way signature line at the foot of the page (Student / Controller)
+    const ph = doc.internal.pageSize.getHeight();
+    const sy = ph - 60, labelY = sy + 14, margin2 = 50, lineW = 150;
+    const leftX = margin2, rightX = pw - margin2 - lineW;
+    doc.setDrawColor(60,60,60).setLineWidth(0.75);
+    [[leftX,'Student Signature'],[rightX,'Controller of Examination']].forEach(([x,label])=>{
+      doc.line(x, sy, x + lineW, sy);
+      doc.setFont('helvetica','normal').setFontSize(9).setTextColor(40,40,40);
+      doc.text(label, x + lineW/2, labelY, {align:'center'});
+    });
+    doc.setTextColor(0,0,0);
+  });
+  if(!page){ toast(selectedPrograms.size ? 'No students match the selected department/program(s) in Timetable -- Program-wise' : 'No student paper data yet -- run Auto Schedule and Generate Seating first','warn'); return; }
+  doc.save('student-admit-cards.pdf');
+  toast(`Downloaded Student Admit Cards PDF -- ${page} student page(s)`,'ok');
 }
 function pdfDaily(){
   const rows = [];
